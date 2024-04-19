@@ -38,6 +38,15 @@ The datasets that I downloaded form this repository are:
 
 # Cleaning Process
 
+## Importing libraries
+```{r}
+library(tidyverse)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+```
+
+
 ## Loading the data
 Once I had downloaded the data, it was time to load it onto R and begin the exploratory analysis.
 
