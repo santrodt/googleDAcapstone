@@ -1,0 +1,308 @@
+---
+title: 'Google DA Capstone: Cyclistic'
+author: "Santiago Rodarte"
+date: "2024-04-19"
+output: html_document
+---
+
+# Google Data Analytics Capstone Project: Cyclistic
+
+For this project, I analyzed the fictional company Cyclistic, where I was tasked 
+with completing an analysis of their trip data. The ultimate goal of Cyclistic 
+is to convert casual users to members, and this analysis is the first step towards reaching that goal.
+
+I was tasked with the following:
+
+**How do annual members and casual riders use Cyclistic bikes differently?**
+
+This report includes: 
+
+* A brief description of the data sources used
+* Documentation on the cleaning process
+* Documentation of the analysis
+
+*Key findings, conclusions and recommendations are not included in this report, as they will be included in the presentation*
+
+# Data Used
+
+The data that was used was retrieved from <https://divvybikes.com/system-data>. These datasets were produced by Divvy, a Lyft bike company. It is a repository with historical trip data open to the public. 
+
+After reviewing the data I believe that it is reliable, original, comprehensive, current and cited. 
+
+The datasets that I downloaded form this repository are:
+
+* `Divvy_Trips_2019_Q2.csv`
+* `Divvy_Trips_2019_Q3.csv`
+* `Divvy_Trips_2019_Q4.csv`
+* `Divvy_Trips_2020_Q1.csv`
+
+# Cleaning Process
+
+## Loading the data
+Once I had downloaded the data, it was time to load it onto R and begin the exploratory analysis.
+
+```{r loading data}
+# Define the filepath tha I will use for all of my datasets
+filepath <- ('C:/Users/santi/Desktop/Personal/Cursos/Google Data Analytics/Capstone/Trips Data/')
+
+# Loading the datasets
+q2_2019 <- read.csv(paste(filepath,'Divvy_Trips_2019_Q2.csv',sep=''))
+q3_2019 <- read.csv(paste(filepath,'Divvy_Trips_2019_Q3.csv',sep=''))
+q4_2019 <- read.csv(paste(filepath,'Divvy_Trips_2019_Q4.csv',sep=''))
+q1_2020 <- read.csv(paste(filepath,'Divvy_Trips_2020_Q1.csv',sep=''))
+```
+
+## Exploring the data
+For each one of the datasets, I checked the columns, the types of values, and the dimension, before deciding how I was going to approach the data cleaning process.
+
+```{r exploring datasets}
+# Exploring the 2019 Q2 trips dataset
+View(q2_2019)
+colnames(q2_2019)
+str(q2_2019)
+
+# Exploring the 2019 Q3 trips dataset
+View(q3_2019)
+colnames(q3_2019)
+str(q3_2019)
+
+# Exploring the 2019 Q4 trisp dataset
+View(q4_2019)
+colnames(q4_2019)
+str(q3_2019)
+
+#Exploring the 2020 Q1 trips dataset
+View(q1_2020)
+colnames(q1_2020)
+str(q1_2020)
+```
+
+## Cleaning the data
+After taking a look at the datasets: the 2019 datasets have the same columns, Q1 has different names,so names will have to be changed for all 4 datasets to have the same names. 
+
+1. Names will have to be changed in order for all 4 tables to have the same column names.
+
+2. Characters will have to be changed: id to `chr` for 2019 datasets (2020 ds id columns cannot be changed to int), dates in every tables will be changed to `datetime`, `tripduration` will be deleted and later created into the merged dataset.
+
+3. New columns: 2020 tables will have new column for trip duration, columns will be reordered.
+
+4. Delete columns - in 2019 tables: `bike_id` (there is no `bike_id` in 2020), `gender`, `birthyear` - in 2020 table: `rideable_type`, `start_lat`, `start_lng`, `end_lat`, `end_lng`.
+
+5. 2019 datasets have 'Customer' or 'Subscriber', we will change it to 2020 values 'Casual' or 'Member'
+
+```{r}
+# Changing the names for q2_2019
+colnames(q2_2019) <- c('trip_id','start_time','end_time', 'bikeid','tripduration',
+                       'from_station_id','from_station_name','to_station_id',
+                       'to_station_name','usertype','gender','birthyear')
+View(q2_2019)
+
+# Now that the 2019 tables have the same names, I will merge them
+trips_2019 <- bind_rows(q2_2019,q3_2019,q4_2019)
+View(trips_2019)
+
+# I will now remove the columns from the 2019 dataset
+trips_2019_v2 <- subset(trips_2019, select = -c(bikeid,tripduration,gender,birthyear))
+View(trips_2019_v2)
+colnames(trips_2019_v2) <- c('trip_id','start_time','end_time','start_station_id',
+                             'start_station_name','end_station_id','end_station_name',
+                             'usertype')
+
+
+# I will now delete the columns from the 2020 table and change the names of the
+# remaining columns
+q1_2020_v2 <- subset(q1_2020, select = -c(rideable_type, start_lat, start_lng,
+                                          end_lat, end_lng))
+View(q1_2020_v2)
+
+# Rename columns in 2020 dataset and reorder for the to make sense with 2019 trips
+colnames(q1_2020_v2) <- c('trip_id','start_time','end_time','start_station_name','start_station_id',
+                          'end_station_name','end_station_id','usertype')
+col_order <- c('trip_id','start_time','end_time','start_station_id','start_station_name',
+               'end_station_id','end_station_name','usertype')
+q1_2020_v3 <- q1_2020_v2[, col_order]
+
+View(q1_2020_v3)
+
+
+# Prepare to merge the datasets
+str(trips_2019_v2)
+str(q1_2020_v3)
+trips_2019_v2$trip_id <- as.character(trips_2019_v2$trip_id)
+str(trips_2019_v2)
+```
+
+## Merging the datasets and cleaning final dataset
+```{r}
+trips_df <- bind_rows(trips_2019_v2,q1_2020_v3)
+View(trips_df)
+
+dim(trips_df)
+str(trips_df)
+summary(trips_df)
+```
+
+Steps to take in this part
+(1) Change data type of stat time and end time to datetime
+(2) Create the trip_duration column using the end_time - start_time
+(3) Change 'Customer' to 'casual' and 'Subscriber' to 'member'
+(4) Add Day, Month, Year columns
+(5) Check for Null values, numerical incoherences, etc.
+
+Convert start time and end time to datetime:
+```{r}
+trips_df$start_time <- ymd_hms(trips_df$start_time)
+trips_df$end_time <- ymd_hms(trips_df$end_time)
+str(trips_df)
+dim(trips_df)
+```
+
+Add new `tripduration` column
+```{r}
+trips_df$tripduration <- trips_df$end_time - trips_df$start_time
+View(trips_df)
+str(trips_df)
+trips_df$tripduration <- as.numeric(trips_df$tripduration)
+dim(trips_df)
+```
+
+Add Year, Month, Day, and day of week columns using `lubridate`
+```{r}
+trips_df$year <- year(trips_df$start_time)
+trips_df$month <- month(trips_df$start_time)
+trips_df$day <- day(trips_df$start_time)
+trips_df$day_of_week <- wday(trips_df$start_time, label=TRUE)
+```
+
+Change the subscriber/customer to member/casual
+```{r}
+trips_df <- trips_df %>%
+  mutate(usertype = recode(usertype,
+                           'Subscriber'='member',
+                           'Customer'='casual'))
+table(trips_df$usertype)
+```
+
+Now I will delete the rows that have a tripduration < 0:
+```{r}
+temp_df <- trips_df %>% filter(tripduration < 0)
+dim(temp_df)
+View(temp_df)
+
+rows_to_remove <- as.vector(temp_df$tripduration)
+
+trips_df_v2 <- trips_df[!(trips_df$start_station_name=='HQ QR' | trips_df$tripduration<0),]
+```
+
+ Lastly, I will fix the only null value there is. Since it it a row without info, it will be deleted.
+```{r}
+trips_df_v3 <- trips_df_v2[complete.cases(trips_df_v2),]
+summary(trips_df_v3)
+```
+
+Change the tripduration to minutes so it is easier to understand.
+```{r}
+trips_df_v3 <- trips_df_v3 %>%
+  mutate(tripduration = tripduration / 60)
+```
+
+# Analyzing process
+
+I will start by analyzing the time duration of the different trips, and how they change depending on the type of user.
+
+```{r}
+summary(trips_df_v3$tripduration)
+
+aggregate(trips_df_v3$tripduration~trips_df_v3$usertype, FUN=mean)
+aggregate(trips_df_v3$tripduration~trips_df_v3$usertype, FUN=median)
+aggregate(trips_df_v3$tripduration~trips_df_v3$usertype, FUN=max)
+aggregate(trips_df_v3$tripduration~trips_df_v3$usertype, FUN=min)
+
+aggregate(trips_df_v3$tripduration~trips_df_v3$usertype +
+            trips_df_v3$day_of_week, FUN = mean)
+
+trips_df_v3 %>% group_by(usertype,day_of_week) %>% 
+  summarise(number_of_rides =n(),
+            average_duration = mean(tripduration)) %>% 
+  arrange(usertype, day_of_week)
+```
+
+Next, I will create visualizations that will allow me to see how the behavior changes depending on the different type of user.
+
+### Average trip duration by user
+I will see how the duration of the trip changes for each type of user.
+```{r}
+trips_df_v3 %>% 
+  filter(tripduration<100) %>% 
+  ggplot(aes(x=tripduration, fill=usertype)) + 
+  geom_density(alpha=0.8) +
+  scale_fill_manual(values = c("#0ADD08", "#2290AD")) +
+  labs(x='Trip Duration (Minutes)',fill='User Type',
+       title='Average Trip Duration by User Type') +
+  theme_classic() +
+  theme(legend.position = 'bottom')
+```
+
+### Number of rides per day of the week
+I will see how the number of rides changes throughout the week, and how different types of users behave each day.
+```{r}
+trips_df_v3 %>% group_by(usertype,day_of_week) %>% 
+  summarise(number_of_rides =n(),
+            average_duration = mean(tripduration)) %>% 
+  arrange(usertype, day_of_week) %>% 
+  ggplot(aes(x=day_of_week,y=number_of_rides,fill=usertype)) +
+  geom_col(position='dodge') + 
+  scale_fill_manual(values = c("#0ADD08", "#2290AD")) +
+  theme_classic() +
+  theme(legend.position='bottom') +
+  labs(x='Weekday',y='Number of Rides',fill='User Type',
+       title='Number of Rides per Day of the Week by User Type')
+```
+
+**For the next plots, I will have to modify how month are presented in the dataset. Tey are represented as numbers, and I want them to be represented with names.**
+
+```{r}
+trips_df_v3$month <- month(trips_df_v3$month, label=TRUE)
+```
+
+### Distribution of rides through the year
+I will see what percentage of rides are taken by each type of user through the year.
+```{r}
+trips_df_v3 %>% group_by(usertype, month, year) %>% 
+  summarise(number_of_rides= n()) %>%
+  filter(number_of_rides > 0) %>% 
+  ggplot(aes(x=month,y=number_of_rides,fill=usertype)) +
+  geom_bar(position='fill',stat='identity', width=0.7) + 
+  facet_wrap(~year, nrow=1) +
+  labs(x='Month', y='Proportion of Rides',fill='User Type',
+       subtitle='Proportion of the rides per type of user') +
+  ggtitle('Distribution of Rides per User Type for the Past Year') +
+  theme_classic() +
+  theme(legend.position='bottom',axis.text.x = element_text(angle=45)) +
+  scale_fill_manual(values = c("#0ADD08", "#2290AD"))
+```
+
+### Number of rides through the year
+I will see how the number of total rides changes throughout the year, and the number of rides that each user takes per month.
+```{r}
+trips_df_v3 %>% group_by(usertype, month, year) %>% 
+  summarise(number_of_rides= n()) %>% 
+  ggplot(aes(x=month,y=number_of_rides,fill=usertype)) +
+  geom_bar(position='stack',stat='identity') + 
+  facet_wrap(~year,nrow=1) +
+  labs(x='Month', y='Number of Rides',fill='User Type',
+       subtitle='Count of the rides per type of user') +
+  ggtitle('Number of Rides per User Type for the Past Year') +
+  theme_classic() +
+  theme(legend.position='bottom',axis.text.x = element_text(angle=45)) +
+  scale_fill_manual(values = c("#0ADD08", "#2290AD"))
+```
+
+
+# Conclusion
+This is the process that I followed for my analysis, from the data loading, to the data cleansing process, to the analysis process. 
+
+Conclusions and recommndations are inside the presentation that i have prepared.
+
+
+
